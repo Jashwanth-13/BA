@@ -1,13 +1,273 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>GigWorker Voice App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- HTTPS for mic on StackBlitz -->
-  <script>window.isSecureContext = true;</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GigWorker Voice App - LIVE DEMO</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:system-ui,-apple-system,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:#fff;padding:20px;overflow-x:hidden;}
+    .container{max-width:900px;margin:0 auto;}
+    
+    /* MASSIVE VOICE BUTTON */
+    #voiceBtn{position:fixed;top:30px;right:30px;z-index:1000;width:90px;height:90px;border-radius:50%;border:4px solid #fff;background:#4CAF50;color:#fff;font-size:28px;font-weight:bold;box-shadow:0 15px 40px rgba(0,0,0,0.4);cursor:pointer;transition:all 0.3s;}
+    #voiceBtn:hover{transform:scale(1.1);}
+    #voiceBtn.listening{background:#f44336!important;animation:pulse 1s infinite;border-color:#ffeb3b;}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(244,67,54,0.8);}70%{box-shadow:0 0 0 25px rgba(244,67,54,0);}100%{box-shadow:0 0 0 0 rgba(244,67,54,0);}}
+    
+    /* STATUS */
+    .status{position:fixed;top:140px;right:25px;background:rgba(0,0,0,0.8);padding:15px 20px;border-radius:25px;backdrop-filter:blur(20px);font-size:14px;text-align:center;width:220px;}
+    
+    /* SECTIONS */
+    .section{background:rgba(255,255,255,0.1);border-radius:25px;padding:30px;margin:30px 0;max-height:60vh;overflow-y:auto;backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.2);}
+    .message{padding:16px 20px;margin:12px 0;border-radius:18px;max-width:85%;word-break:break-word;}
+    .you{background:linear-gradient(135deg,#4CAF50,#45a049);margin-left:auto;text-align:right;}
+    .bot{background:rgba(255,255,255,0.2);}
+    
+    .gig-item{display:flex;justify-content:space-between;align-items:center;padding:20px;background:rgba(255,255,255,0.15);border-radius:15px;margin:12px 0;border-left:4px solid #4CAF50;}
+    .delete-btn{background:#ff4444;color:#fff;border:none;padding:12px 20px;border-radius:10px;cursor:pointer;font-weight:bold;font-size:14px;}
+    
+    h1{text-align:center;font-size:2.8em;margin:40px 0 20px 0;font-weight:700;text-shadow:0 4px 20px rgba(0,0,0,0.3);}
+    h2{text-align:center;margin:25px 0 20px 0;font-size:1.8em;}
+    h3{margin-bottom:20px;}
+    input,select{width:100%;padding:18px;border-radius:15px;border:none;font-size:16px;margin:10px 0;background:rgba(255,255,255,0.9);}
+    button{padding:15px 30px;background:#4CAF50;color:white;border:none;border-radius:15px;cursor:pointer;font-weight:bold;font-size:16px;width:100%;margin:10px 0;transition:0.3s;}
+    button:hover{transform:translateY(-2px);}
+    .help{text-align:center;padding:30px;background:rgba(0,0,0,0.4);border-radius:25px;font-size:16px;line-height:1.6;}
+    .count{background:#4CAF50;padding:12px 25px;border-radius:30px;font-weight:bold;display:inline-block;}
+    #listeningIndicator{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#f44336;color:#fff;padding:20px 30px;border-radius:50px;font-weight:bold;animation:flash 2s infinite;display:none;}
+    @keyframes flash{0%,100%{opacity:1;}50%{opacity:0.6;}}
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div class="container">
+    <h1>🎯 GigWorker Voice App</h1>
+    
+    <!-- STATUS -->
+    <div class="status" id="status">
+      <div><strong id="gigCount">0 gigs</strong></div>
+      <div id="voiceStatus">🔴 OFF</div>
+      <div id="sensitivity">Ultra sensitive</div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="section" id="chatSection">
+      <h2>💬 Voice Chat</h2>
+      <div id="chat">
+        <div class="message bot">
+          🤖 <strong>GigBot:</strong> 🎤 dabaao! Chhoti awaaz mein bhi sununga. "plumber chahiye"?
+        </div>
+      </div>
+    </div>
+
+    <!-- POST GIG FORM -->
+    <div class="section" id="formSection" style="display:none;">
+      <h2>📝 Post New Gig</h2>
+      <form id="gigForm">
+        <input id="cname" placeholder="👤 Customer Name" required>
+        <input id="phone" placeholder="📱 Phone" required>
+        <select id="service" required>
+          <option value="">💼 Select Service</option>
+          <option value="Plumber">Plumber (₹500)</option>
+          <option value="Electrician">Electrician (₹600)</option>
+          <option value="Painter">Painter (₹400)</option>
+          <option value="Carpenter">Carpenter (₹700)</option>
+        </select>
+        <input id="price" type="number" placeholder="💰 Price ₹500" required>
+        <input id="time" placeholder="🕒 Time (Kal 9 AM)" required>
+        <button type="submit">🚀 Post Gig</button>
+      </form>
+    </div>
+
+    <!-- GIGS LIST -->
+    <div class="section" id="gigsSection">
+      <h2>📋 Booked Gigs <span class="count" id="totalGigs">0</span></h2>
+      <div id="gigsList">Voice commands se pehla gig book karo!</div>
+    </div>
+
+    <div class="help">
+      🎤 <strong>Voice Commands (Whispers OK):</strong><br>
+      "plumber chahiye" | "electrician book" | "services dikhao" | "post gig" | "gigs show" | "delete last"
+    </div>
+  </div>
+
+  <!-- VOICE BUTTON -->
+  <button id="voiceBtn" title="Voice ON/OFF">🎤</button>
+  <div id="listeningIndicator">🔴 LIVE - Boliye bhai!</div>
+
+  <script>
+    let recognition, listening=false, gigs=JSON.parse(localStorage.getItem('gigs')||'[]');
+    
+    // RENDER ON LOAD
+    renderGigs();
+    
+    // VOICE BUTTON
+    document.getElementById('voiceBtn').onclick = ()=>{
+      if(!recognition) initVoice();
+      if(listening) stopVoice(); else startVoice();
+    };
+    
+    function initVoice(){
+      try{
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 3;
+        recognition.lang = 'en-IN';
+        
+        recognition.onresult = (e)=>{
+          const text = e.results[e.results.length-1][0].transcript;
+          addMessage('you', text);
+          processCommand(text.toLowerCase().trim());
+        };
+        
+        recognition.onerror = (e)=>{
+          if(e.error==='no-speech' && listening) setTimeout(()=>recognition.start(), 200);
+        };
+        
+        recognition.onend = ()=>{
+          if(listening) setTimeout(()=>recognition.start(), 300);
+        };
+      }catch(e){
+        alert('Chrome me kholo bhai!');
+      }
+    }
+    
+    function startVoice(){
+      recognition.start();
+      listening=true;
+      document.getElementById('voiceBtn').classList.add('listening');
+      document.getElementById('voiceStatus').textContent='🟢 LIVE';
+      document.getElementById('listeningIndicator').style.display='block';
+      speak("Namaste bhai! GigWorker ultra sensitive mode ON! Kya service chahiye?");
+    }
+    
+    function stopVoice(){
+      recognition.stop();
+      listening=false;
+      document.getElementById('voiceBtn').classList.remove('listening');
+      document.getElementById('voiceStatus').textContent='🔴 OFF';
+      document.getElementById('listeningIndicator').style.display='none';
+      addMessage('bot', '👋 Voice OFF');
+    }
+    
+    function speak(text){
+      speechSynthesis.cancel();
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = 'hi-IN';
+      msg.rate = 0.9;
+      msg.pitch = 1.0;
+      speechSynthesis.speak(msg);
+      addMessage('bot', text);
+    }
+    
+    function addMessage(sender, text){
+      const chat = document.getElementById('chat');
+      const div = document.createElement('div');
+      div.className = `message ${sender}`;
+      div.innerHTML = `<strong>${sender==='you'?'👤 Aap':'🤖 GigBot'}:</strong> ${text}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      document.getElementById('chatSection').scrollIntoView();
+    }
+    
+    function processCommand(cmd){
+      console.log('🎤', cmd);
+      
+      // SERVICES
+      if(cmd.includes('service')||cmd.includes('kya')||cmd.includes('सर्विस')){
+        speak('Services: Plumber ₹500, Electrician ₹600, Painter ₹400, Carpenter ₹700. Boliye kaunsi book karni hai!');
+        return;
+      }
+      
+      // PLUMBER
+      if(cmd.includes('plumber')||cmd.includes('प्लंबर')||cmd.includes('pipe')||cmd.includes('leak')){
+        bookGig('Plumber','₹500','Pipe Repair','Voice Customer','9876543210','Kal 9 AM');
+        speak('✅ Plumber book! Kal subah 9 baje aa jayega!');
+        return;
+      }
+      
+      // ELECTRICIAN
+      if(cmd.includes('electrician')||cmd.includes('इलेक्ट्रीशियन')||cmd.includes('fuse')||cmd.includes('light')){
+        bookGig('Electrician','₹600','Electrical Repair','Voice Customer','9876543211','Kal 10 AM');
+        speak('✅ Electrician book ho gaya!');
+        return;
+      }
+      
+      // POST FORM
+      if(cmd.includes('post')||cmd.includes('gig')||cmd.includes('form')||cmd.includes('daalo')){
+        document.getElementById('formSection').style.display='block';
+        document.getElementById('formSection').scrollIntoView();
+        speak('✅ Gig post form khol diya!');
+        return;
+      }
+      
+      // SHOW GIGS
+      if(cmd.includes('gigs')||cmd.includes('show')||cmd.includes('dikhao')){
+        document.getElementById('gigsSection').scrollIntoView();
+        speak(`${gigs.length} gigs hain bhai!`);
+        return;
+      }
+      
+      // DELETE LAST
+      if(cmd.includes('delete')||cmd.includes('हटाओ')){
+        if(gigs.length>0){
+          gigs.pop();
+          localStorage.setItem('gigs',JSON.stringify(gigs));
+          renderGigs();
+          speak('✅ Last gig delete!');
+        }
+        return;
+      }
+      
+      // DEFAULT BOOK
+      bookGig('General Service','₹500',cmd,'Voice Customer','9876543212','Kal 9 AM');
+      speak('✅ Expert bhej raha hun kal subah!');
+    }
+    
+    function bookGig(service,price,desc,name,phone,time){
+      const gig = {id:Date.now(),service,price,desc,name,phone,time};
+      gigs.unshift(gig);
+      localStorage.setItem('gigs',JSON.stringify(gigs));
+      renderGigs();
+    }
+    
+    function renderGigs(){
+      document.getElementById('totalGigs').textContent=gigs.length;
+      document.getElementById('gigCount').textContent=gigs.length+' gigs';
+      
+      const list = document.getElementById('gigsList');
+      if(gigs.length===0){
+        list.innerHTML='<div style="text-align:center;padding:40px;color:#ccc;">Voice se gig book karo!</div>';
+        return;
+      }
+      
+      list.innerHTML = gigs.slice(0,10).map(gig=>`
+        <div class="gig-item">
+          <div>
+            <h3 style="margin:0 0 8px 0;color:#4CAF50;">${gig.service}</h3>
+            <div style="font-size:14px;">${gig.price} | 📞 ${gig.phone} | ${gig.time}</div>
+            <small style="opacity:0.8;">${gig.desc}</small>
+          </div>
+          <button class="delete-btn" onclick="gigs=gigs.filter(g=>g.id!=${gig.id});localStorage.setItem('gigs',JSON.stringify(gigs));renderGigs();speak('Gig delete!');">🗑️</button>
+        </div>
+      `).join('');
+    }
+    
+    // FORM SUBMIT
+    document.getElementById('gigForm').onsubmit = (e)=>{
+      e.preventDefault();
+      const name = document.getElementById('cname').value;
+      const phone = document.getElementById('phone').value;
+      const service = document.getElementById('service').value;
+      const price = document.getElementById('price').value;
+      const time = document.getElementById('time').value;
+      
+      bookGig(service,`₹${price}`,service,name,phone,time);
+      speak('✅ Gig post ho gaya!');
+      document.getElementById('formSection').style.display='none';
+      e.target.reset();
+    };
+  </script>
 </body>
 </html>
